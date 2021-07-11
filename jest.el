@@ -68,6 +68,11 @@ When t, this toggles the behaviour of the prefix argument."
   :group 'jest
   :type 'string)
 
+(defcustom jest-inspect-executable "node --inspect-brk node_modules/.bin/jest --runInBand --no-cache"
+  "The name of the jest inspect-brk executable."
+  :group 'jest
+  :type 'string)
+
 (defcustom jest-setup-hook nil
   "Hooks to run before a jest process starts."
   :group 'jest
@@ -177,6 +182,7 @@ When non-nil only ‘test_foo()’ will match, and nothing else."
     (?f "Test file" jest-file-dwim)
     (?F "Test this file  " jest-file)
     (?d "Test function " jest-function)
+    (?i "Test this file with inspect " jest-file-with-inspect)
     "Repeat tests"
     (?r "Repeat last test run" jest-repeat))
   :max-action-columns 2
@@ -237,6 +243,23 @@ When pointer is not inside a test function jest is run on the whole file."
 
 
 ;;;###autoload
+(defun jest-file-with-inspect (file &optional args)
+  "Run jest on FILE with inspect, using ARGS.
+
+Additional ARGS are passed along to jest.
+With a prefix argument, allow editing."
+  (interactive
+   (list
+    (buffer-file-name)
+    (jest-arguments)))
+  (jest--run
+   :args (-snoc args "--watch")
+   :file file
+   :inspect t
+   :edit current-prefix-arg))
+
+
+;;;###autoload
 (defun jest-last-failed (&optional args)
   "Run jest, only executing previous test failures.
 
@@ -279,7 +302,7 @@ With a prefix ARG, allow editing."
   (setq-default comint-prompt-read-only nil)
   (compilation-setup t))
 
-(cl-defun jest--run (&key args file testname edit)
+(cl-defun jest--run (&key args file testname inspect edit)
   "Run jest for the given arguments."
   (let ((popup-arguments args))
     (setq args (jest--transform-arguments args))
@@ -291,7 +314,10 @@ With a prefix ARG, allow editing."
     (when testname
       (setq args (-snoc args "--testNamePattern" (jest--shell-quote testname))))
 
-      (setq args (cons jest-executable args) command (s-join " " args))
+    (if inspect
+      (setq args (cons jest-inspect-executable args))
+      (setq args (cons jest-executable args)))
+    (setq command (s-join " " args))
 
       (jest--run-command
        :command command
